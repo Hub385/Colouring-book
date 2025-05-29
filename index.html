@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <title>Space Explorer Colouring Book</title>
@@ -49,12 +50,18 @@
     <button onclick="clearCanvas()">❌ Clear</button>
     <button onclick="downloadImage()">📥 Download</button>
   </div>
-  <canvas id="canvas" width="600" height="400"></canvas>  <script>
+  <canvas id="canvas" width="600" height="400"></canvas>
+
+  <script>
     const canvas = document.getElementById('canvas');
     const ctx = canvas.getContext('2d');
     const colorPicker = document.getElementById('colorPicker');
     let tool = 'brush';
     let drawing = false;
+
+    // Manually ensure canvas dimensions (helps fix drawing bug)
+    canvas.width = 600;
+    canvas.height = 400;
 
     function setTool(t) {
       tool = t;
@@ -94,28 +101,36 @@
 
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
+
+      // Planet
       ctx.beginPath();
-      ctx.arc(300, 200, 80, 0, 2 * Math.PI); // planet
+      ctx.arc(300, 200, 80, 0, 2 * Math.PI);
+      ctx.stroke();
+
+      // Rocket
+      ctx.beginPath();
       ctx.moveTo(150, 100);
-      ctx.lineTo(200, 130); // rocket body
+      ctx.lineTo(200, 130);
       ctx.lineTo(180, 170);
       ctx.lineTo(130, 140);
       ctx.closePath();
       ctx.stroke();
 
+      // Astronaut
       ctx.beginPath();
-      ctx.arc(400, 100, 20, 0, 2 * Math.PI); // astronaut helmet
+      ctx.arc(400, 100, 20, 0, 2 * Math.PI);
       ctx.moveTo(400, 120);
-      ctx.lineTo(400, 160); // body
+      ctx.lineTo(400, 160);
       ctx.stroke();
     }
 
     function floodFill(x, y) {
-      // placeholder basic bucket tool
+      // Placeholder fill tool — fills a small square around the point
       ctx.fillStyle = colorPicker.value;
       ctx.fillRect(x - 5, y - 5, 10, 10);
     }
 
     drawLineArt();
-  </script></body>
+  </script>
+</body>
 </html>
