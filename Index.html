@@ -1,0 +1,121 @@
+<!DOCTYPE html><html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Space Explorer Colouring Book</title>
+  <style>
+    body {
+      background: #222;
+      color: #fff;
+      font-family: 'Courier New', monospace;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 2em;
+      margin-bottom: 10px;
+    }
+    #toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button, input[type="color"] {
+      font-family: inherit;
+      font-size: 1em;
+      padding: 8px;
+      border: 2px solid #fff;
+      background: #444;
+      color: #fff;
+      cursor: pointer;
+    }
+    canvas {
+      border: 3px solid #fff;
+      image-rendering: pixelated;
+      background: #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>🪐 Space Explorer Colouring Book</h1>
+  <div id="toolbar">
+    <button onclick="setTool('brush')">🖌️ Brush</button>
+    <button onclick="setTool('fill')">🪣 Fill</button>
+    <input type="color" id="colorPicker" value="#ffcc00">
+    <button onclick="clearCanvas()">❌ Clear</button>
+    <button onclick="downloadImage()">📥 Download</button>
+  </div>
+  <canvas id="canvas" width="600" height="400"></canvas>  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const colorPicker = document.getElementById('colorPicker');
+    let tool = 'brush';
+    let drawing = false;
+
+    function setTool(t) {
+      tool = t;
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (tool === 'brush') drawing = true;
+      if (tool === 'fill') floodFill(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener('mouseup', () => drawing = false);
+    canvas.addEventListener('mouseout', () => drawing = false);
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (drawing && tool === 'brush') {
+        ctx.fillStyle = colorPicker.value;
+        ctx.beginPath();
+        ctx.arc(e.offsetX, e.offsetY, 5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    });
+
+    function clearCanvas() {
+      drawLineArt();
+    }
+
+    function downloadImage() {
+      const link = document.createElement('a');
+      link.download = 'space_colouring.png';
+      link.href = canvas.toDataURL();
+      link.click();
+    }
+
+    function drawLineArt() {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(300, 200, 80, 0, 2 * Math.PI); // planet
+      ctx.moveTo(150, 100);
+      ctx.lineTo(200, 130); // rocket body
+      ctx.lineTo(180, 170);
+      ctx.lineTo(130, 140);
+      ctx.closePath();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(400, 100, 20, 0, 2 * Math.PI); // astronaut helmet
+      ctx.moveTo(400, 120);
+      ctx.lineTo(400, 160); // body
+      ctx.stroke();
+    }
+
+    function floodFill(x, y) {
+      // placeholder basic bucket tool
+      ctx.fillStyle = colorPicker.value;
+      ctx.fillRect(x - 5, y - 5, 10, 10);
+    }
+
+    drawLineArt();
+  </script></body>
+</html>
