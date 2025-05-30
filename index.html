@@ -49,6 +49,9 @@
       display: block;
       background: #222;
       touch-action: none;
+      position: absolute;
+      top: 0;
+      left: 0;
     }
   </style>
 </head>
@@ -76,63 +79,46 @@
     resizeCanvas();
 
     function getPos(e) {
-      if (e.touches && e.touches.length) {
-        const touch = e.touches[0];
-        return { x: touch.clientX, y: touch.clientY };
-      } else if (e.changedTouches && e.changedTouches.length) {
-        const touch = e.changedTouches[0];
-        return { x: touch.clientX, y: touch.clientY };
-      } else {
-        return { x: e.clientX, y: e.clientY };
-      }
+      return { x: e.clientX, y: e.clientY };
     }
 
     function startSpray(e) {
       e.preventDefault();
-      lastPos = getPos(e);
       spraying = true;
+      lastPos = getPos(e);
       spray();
       sprayInterval = setInterval(spray, 50);
     }
 
-    function stopSpray(e) {
+    function moveSpray(e) {
+      if (!spraying) return;
+      e.preventDefault();
+      lastPos = getPos(e);
+    }
+
+    function stopSpray() {
       spraying = false;
       clearInterval(sprayInterval);
     }
 
     function spray() {
-      if (!spraying) return;
       const radius = parseInt(sizePicker.value, 10);
       ctx.fillStyle = colorPicker.value;
-      const dots = Math.floor(radius / 2);
+      const dots = Math.floor(radius * 0.5);
       for (let i = 0; i < dots; i++) {
-        const offsetX = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
-        const offsetY = Math.floor(Math.random() * (radius * 2 + 1)) - radius;
+        const offsetX = Math.random() * radius * 2 - radius;
+        const offsetY = Math.random() * radius * 2 - radius;
         if (offsetX * offsetX + offsetY * offsetY <= radius * radius) {
           ctx.fillRect(lastPos.x + offsetX, lastPos.y + offsetY, 2, 2);
         }
       }
     }
 
-    // Mouse events
-    canvas.addEventListener('mousedown', startSpray);
-    canvas.addEventListener('mousemove', (e) => {
-      if (spraying) {
-        lastPos = getPos(e);
-      }
-    });
-    canvas.addEventListener('mouseup', stopSpray);
-    canvas.addEventListener('mouseleave', stopSpray);
-
-    // Touch events
-    canvas.addEventListener('touchstart', startSpray);
-    canvas.addEventListener('touchmove', (e) => {
-      if (spraying) {
-        lastPos = getPos(e);
-      }
-    });
-    canvas.addEventListener('touchend', stopSpray);
-    canvas.addEventListener('touchcancel', stopSpray);
+    // Use pointer events for broad device support
+    canvas.addEventListener('pointerdown', startSpray);
+    canvas.addEventListener('pointermove', moveSpray);
+    canvas.addEventListener('pointerup', stopSpray);
+    canvas.addEventListener('pointerleave', stopSpray);
 
     clearBtn.addEventListener('click', () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
