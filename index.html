@@ -1,187 +1,115 @@
 <!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Spray Paint Canvas + Tools</title>
+  <title>Space Colouring Canvas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      background: #fff !important;
-      color: #000;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%; overflow: hidden;
+      background: #fff;
     }
     #toolbar {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: center;
-      align-items: center;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 6px 10px;
-      border-radius: 6px;
-      max-width: calc(100% - 20px);
-      box-sizing: border-box;
-      z-index: 10;
-      touch-action: none;
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+      background: rgba(0,0,0,0.8); padding: 6px 10px; border-radius: 6px;
+      max-width: calc(100% - 20px); box-sizing: border-box; z-index: 10;
     }
-    #toolbar label, #toolbar button, #toolbar select {
-      color: #fff;
-      font-family: 'Courier New', monospace;
-      font-size: 0.9em;
+    #toolbar * { font-family: 'Courier New', monospace; color: #fff; }
+    #toolbar input, #toolbar select, #toolbar button {
+      background: #444; border: 2px solid #fff; color: #fff;
+      padding: 4px 6px; border-radius: 4px; cursor: pointer;
     }
-    #toolbar input[type="color"],
-    #toolbar input[type="range"],
-    #toolbar button,
-    #toolbar select {
-      cursor: pointer;
-      background: #444;
-      border: 2px solid #fff;
-      color: #fff;
-      font-family: inherit;
-      padding: 4px 6px;
-      border-radius: 4px;
-      touch-action: none;
-    }
-    canvas {
-      display: block;
-      background: #fff !important;
-      touch-action: none;
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-    }
+    canvas { position: absolute; top:0; left:0; width:100%; height:100%; touch-action: none; }
   </style>
 </head>
 <body>
   <div id="toolbar">
+    <label>Template <select id="templatePicker">
+      <option value="">-- choose image --</option>
+      <option value="astronaut.png">Astronaut</option>
+      <option value="rocket.png">Rocket</option>
+      <option value="planet.png">Planet</option>
+    </select></label>
     <button onclick="setTool('spray')">Spray</button>
     <button onclick="setTool('brush')">Brush</button>
     <button onclick="setTool('shape')">Shape</button>
-    <label>Shape <select id="shapePicker"><option value="circle">Circle</option><option value="rect">Rectangle</option></select></label>
+    <button onclick="setTool('fill')">Fill</button>
+    <label>Shape <select id="shapePicker"><option value="circle">Circle</option><option value="rect">Square</option></select></label>
     <label>Color <input type="color" id="colorPicker" value="#ff0000"></label>
     <label>Size <input type="range" id="sizePicker" min="5" max="100" value="30"></label>
     <button id="clearBtn">Clear</button>
   </div>
-  <canvas id="canvas"></canvas>  <script>
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
+  <canvas id="canvas"></canvas>
+  <script>
+    const canvas = document.getElementById('canvas'), ctx = canvas.getContext('2d');
+    const tpl = document.getElementById('templatePicker');
     const colorPicker = document.getElementById('colorPicker');
     const sizePicker = document.getElementById('sizePicker');
     const shapePicker = document.getElementById('shapePicker');
     const clearBtn = document.getElementById('clearBtn');
+    let tool='spray', spraying=false, brushDrawing=false, lastPos={x:0,y:0};function resize(){ canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
+window.addEventListener('resize', resize); resize();
 
-    let tool = 'spray';
-    let spraying = false;
-    let brushDrawing = false;
-    let sprayInterval;
-    let lastPos = { x: 0, y: 0 };
+function setTool(t){ tool=t; }
+tpl.addEventListener('change',()=>{
+  const src=tpl.value;
+  if(!src){ ctx.clearRect(0,0,canvas.width,canvas.height); return; }
+  const img=new Image(); img.onload=()=>{
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    ctx.drawImage(img,0,0,canvas.width, canvas.height);
+  };
+  img.src=src;
+});
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+function getPos(e){ return {x:e.clientX, y:e.clientY}; }
 
-    function setTool(t) {
-      tool = t;
-    }
+function startAction(e){ e.preventDefault(); lastPos=getPos(e);
+  if(tool==='spray'){ spraying=true; spray(); sprayInt=setInterval(spray,50); }
+  else if(tool==='brush'){ brushDrawing=true; ctx.beginPath(); ctx.moveTo(lastPos.x,lastPos.y); }
+  else if(tool==='shape'){ drawShape(lastPos); }
+  else if(tool==='fill'){ floodFill(lastPos.x,lastPos.y); }
+}
+function moveAction(e){ if(tool==='spray'&&spraying){ lastPos=getPos(e); }
+  if(tool==='brush'&&brushDrawing){ const p=getPos(e); ctx.lineTo(p.x,p.y); ctx.strokeStyle=colorPicker.value; ctx.lineWidth=sizePicker.value; ctx.stroke(); }
+}
+function stopAll(){ spraying=false; brushDrawing=false; clearInterval(window.sprayInt); }
 
-    function getPos(e) {
-      return { x: e.clientX, y: e.clientY };
-    }
+function spray(){ const r=+sizePicker.value, dots=Math.floor(r*0.5);
+  ctx.fillStyle=colorPicker.value;
+  for(let i=0;i<dots;i++){ const dx=Math.random()*2*r-r, dy=Math.random()*2*r-r;
+    if(dx*dx+dy*dy<=r*r) ctx.fillRect(lastPos.x+dx,lastPos.y+dy,2,2);
+  }
+}
+function drawShape(p){ const s=+sizePicker.value; ctx.fillStyle=colorPicker.value;
+  if(shapePicker.value==='circle'){ ctx.beginPath(); ctx.arc(p.x,p.y,s,0,2*Math.PI); ctx.fill(); }
+  else ctx.fillRect(p.x-s/2,p.y-s/2,s,s);
+}
+function floodFill(startX,startY){
+  const w=canvas.width,h=canvas.height;
+  const img=ctx.getImageData(0,0,w,h), d=img.data;
+  const idx=(startY*w+startX)*4;
+  const tr=d[idx],tg=d[idx+1],tb=d[idx+2],ta=d[idx+3];
+  const fc=hexToRgba(colorPicker.value);
+  if(tr===fc.r&&tg===fc.g&&tb===fc.b) return;
+  const stack=[[startX,startY]];
+  while(stack.length){ const [x,y]=stack.pop(); if(x<0||x>=w||y<0||y>=h) continue;
+    const i=(y*w+x)*4;
+    if(d[i]===tr&&d[i+1]===tg&&d[i+2]===tb&&d[i+3]===ta){ d[i]=fc.r; d[i+1]=fc.g; d[i+2]=fc.b; d[i+3]=fc.a;
+      stack.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]); }
+  }
+  ctx.putImageData(img,0,0);
+}
+function hexToRgba(h){ const v=parseInt(h.slice(1),16);
+  return {r:v>>16&255, g:v>>8&255, b:v&255, a:255}; }
 
-    function startSpray(e) {
-      e.preventDefault();
-      lastPos = getPos(e);
-      spraying = true;
-      spray();
-      sprayInterval = setInterval(spray, 50);
-    }
+canvas.addEventListener('pointerdown', startAction);
+canvas.addEventListener('pointermove', moveAction);
+canvas.addEventListener('pointerup', stopAll);
+canvas.addEventListener('pointerleave', stopAll);
 
-    function spray() {
-      const radius = parseInt(sizePicker.value, 10);
-      ctx.fillStyle = colorPicker.value;
-      const dots = Math.floor(radius * 0.5);
-      for (let i = 0; i < dots; i++) {
-        const offsetX = Math.random() * radius * 2 - radius;
-        const offsetY = Math.random() * radius * 2 - radius;
-        if (offsetX*offsetX + offsetY*offsetY <= radius*radius) {
-          ctx.fillRect(lastPos.x + offsetX, lastPos.y + offsetY, 2, 2);
-        }
-      }
-    }
+clearBtn.addEventListener('click',()=>ctx.clearRect(0,0,canvas.width,canvas.height));
 
-    function startBrush(e) {
-      e.preventDefault();
-      brushDrawing = true;
-      const pos = getPos(e);
-      ctx.beginPath();
-      ctx.moveTo(pos.x, pos.y);
-    }
-
-    function brushMove(e) {
-      if (!brushDrawing) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      ctx.strokeStyle = colorPicker.value;
-      ctx.lineWidth = parseInt(sizePicker.value, 10);
-      ctx.lineTo(pos.x, pos.y);
-      ctx.stroke();
-    }
-
-    function stopAll(e) {
-      spraying = false;
-      brushDrawing = false;
-      clearInterval(sprayInterval);
-    }
-
-    function drawShape(e) {
-      e.preventDefault();
-      const pos = getPos(e);
-      const size = parseInt(sizePicker.value, 10);
-      ctx.fillStyle = colorPicker.value;
-      const shape = shapePicker.value;
-      if (shape === 'circle') {
-        ctx.beginPath();
-        ctx.arc(pos.x, pos.y, size, 0, 2 * Math.PI);
-        ctx.fill();
-      } else {
-        ctx.fillRect(pos.x - size/2, pos.y - size/2, size, size);
-      }
-    }
-
-    // Pointer events
-    canvas.addEventListener('pointerdown', (e) => {
-      if (tool === 'spray') startSpray(e);
-      else if (tool === 'brush') startBrush(e);
-      else if (tool === 'shape') drawShape(e);
-    });
-    canvas.addEventListener('pointermove', (e) => {
-      lastPos = getPos(e);
-      if (tool === 'spray') moveSpray(e);
-      if (tool === 'brush') brushMove(e);
-    });
-    canvas.addEventListener('pointerup', stopAll);
-    canvas.addEventListener('pointerleave', stopAll);
-
-    function moveSpray(e) {
-      if (!spraying) return;
-      e.preventDefault();
-      lastPos = getPos(e);
-    }
-
-    clearBtn.addEventListener('click', () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-  </script></body>
+  </script>
+</body>
 </html>
