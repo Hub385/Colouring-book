@@ -5,116 +5,198 @@
   <title>Space Colouring Canvas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
-    /* ------------------------------------------- */
-    /* GLOBAL RESET & BODY                          */
+    /* ------------------ GLOBAL & BODY ------------------ */
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
-      overflow: hidden;    /* We’ll handle scrolling inside toolbar if needed */
-      background: #fff;    /* White behind everything */
-      touch-action: none;  /* Prevent page from scrolling when drawing */
-      font-family: 'Courier New', monospace;
+      overflow: hidden;            /* We handle scrolling in the toolbar if needed */
+      background: #FFFFFF;         /* White page background */
+      touch-action: none;          /* Prevent page scrolling when drawing */
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      color: #333333;
     }
 
-    /* ------------------------------------------- */
-    /* TOOLBAR                                     */
+    /* ------------------ MODERN TOOLBAR ------------------ */
     #toolbar {
       position: absolute;
-      top: 10px;
+      top: 12px;
       left: 50%;
       transform: translateX(-50%);
       display: flex;
       flex-wrap: wrap;
-      gap: 6px;
+      gap: 8px;
       align-items: center;
-      background: rgba(0, 0, 0, 0.6);   /* Slightly translucent so you can see behind it */
-      padding: 6px 10px;                /* Slightly smaller padding */
-      border-radius: 6px;
-      max-width: calc(100% - 20px);
-      max-height: 40vh;                 /* Never taller than 40% of viewport */
-      overflow-y: auto;                 /* If too tall, it scrolls internally */
-      box-sizing: border-box;
-      z-index: 10;                       /* Keep it always on top */
+      background: rgba(255, 255, 255, 0.95);  /* Almost solid white */
+      padding: 12px 16px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      max-width: calc(100% - 24px);
+      max-height: 35vh;                  /* Toolbar limited to 35% of viewport height */
+      overflow-y: auto;                  /* Scroll internally if too tall */
+      z-index: 10;
     }
     #toolbar * {
-      color: #fff;
-      user-select: none; /* Prevent selecting text when tapping on mobile */
-      font-size: 0.85em; /* Smaller font so things fit */
+      user-select: none;
+      font-size: 0.9rem;
     }
-    /* Labels, selects, buttons, range sliders all share this look */
-    #toolbar label,
-    #toolbar select,
-    #toolbar button,
-    #toolbar input[type="range"] {
-      background: #444;
-      border: 2px solid #fff;
-      color: #fff;
-      padding: 3px 5px;
-      border-radius: 4px;
+    /* Template dropdown */
+    #toolbar label {
+      display: flex;
+      flex-direction: column;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    #toolbar select {
+      margin-top: 4px;
+      padding: 6px 10px;
+      border: 2px solid #CCC;
+      border-radius: 6px;
+      background: #FFFFFF;
+      color: #333;
+      font-size: 0.9rem;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
       cursor: pointer;
-      touch-action: none;
     }
-    /* Make the range slider narrower to save space */
+
+    /* Tool Buttons */
+    #toolbar .tool-button {
+      background: #007BFF;   /* Bold blue */
+      border: none;
+      color: #FFFFFF;
+      padding: 8px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+      cursor: pointer;
+    }
+    #toolbar .tool-button:hover:enabled {
+      background: #0056b3;
+      transform: translateY(-1px);
+    }
+    #toolbar .tool-button:disabled {
+      background: #CCCCCC;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* Shape & Size Controls */
+    #toolbar .small-label {
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    #toolbar select#shapePicker,
     #toolbar input[type="range"] {
-      width: 70px;
-      margin: 0 2px;
+      margin-top: 4px;
+      border: 2px solid #CCC;
+      border-radius: 6px;
+      background: #FFFFFF;
+      color: #333;
+      font-size: 0.9rem;
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+    /* Range slider styling */
+    #toolbar input[type="range"] {
+      width: 80px;
       -webkit-appearance: none;
       appearance: none;
+      margin: 0 4px;
+      height: 6px;
+      background: #e0e0e0;
+      border-radius: 3px;
+      outline: none;
     }
     #toolbar input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 14px;
-      height: 14px;
-      background: #fff;
+      width: 16px;
+      height: 16px;
+      background: #007BFF;
       border-radius: 50%;
       cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    }
+    #toolbar input[type="range"]:disabled::-webkit-slider-thumb {
+      background: #AAAAAA;
     }
 
-    /* 20‐Color Palette Swatches */
+    /* 20-Color Palette */
     #colorPalette {
       display: flex;
       flex-wrap: wrap;
-      gap: 3px;
-      max-width: 180px;
+      gap: 6px;
+      margin-top: 4px;
+      max-width: 220px;
     }
     .swatch {
-      width: 18px;
-      height: 18px;
-      border: 2px solid #fff;
-      border-radius: 3px;
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      border: 2px solid transparent;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
       cursor: pointer;
+      transition: transform 0.1s, border-color 0.2s;
+    }
+    .swatch:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
     }
     .swatch.selected {
-      outline: 2px solid #fff;
+      border-color: #333333;
     }
 
-    /* Loading indicator text */
+    /* Loading Text (small and subtle) */
     #loadingIndicator {
-      color: #ff0;
-      font-size: 0.8em;
-      margin-left: 4px;
+      font-size: 0.8rem;
+      color: #e67e22; /* orange highlight */
+      margin-left: 6px;
+      align-self: flex-end;
     }
 
-    /* ------------------------------------------- */
-    /* CANVAS                                      */
+    /* Clear button */
+    #clearBtn {
+      background: #dc3545;   /* Bold red */
+      border: none;
+      color: #FFFFFF;
+      padding: 8px 14px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    #clearBtn:hover:enabled {
+      background: #a71d2a;
+      transform: translateY(-1px);
+    }
+    #clearBtn:disabled {
+      background: #CCCCCC;
+      cursor: not-allowed;
+      box-shadow: none;
+      transform: none;
+    }
+
+    /* ------------------ CANVAS ------------------ */
     #canvas {
       position: absolute;
-      top: 0;     /* We’ll offset it via JS so it sits below the toolbar */
+      top: 0;     /* We will reposition below via JS */
       left: 0;
       width: 100%;
       height: 100%;
-      background: #fff;     /* White behind everything */
-      touch-action: none;   /* Prevent page from scrolling while drawing */
+      background: #FFFFFF;
+      touch-action: none;
     }
   </style>
 </head>
 <body>
-
-  <!-- ------------------------------------------- -->
-  <!-- TOOLBAR HTML                                -->
+  <!-- TOOLBAR -->
   <div id="toolbar">
     <!-- 1) Template Selector -->
     <label>
@@ -129,343 +211,5 @@
     <span id="loadingIndicator" style="display: none;">Loading…</span>
 
     <!-- 2) Tool Buttons -->
-    <button id="sprayBtn" disabled>Spray</button>
-    <button id="brushBtn" disabled>Brush</button>
-    <button id="shapeBtn" disabled>Shape</button>
-    <button id="fillBtn" disabled>Fill</button>
-
-    <!-- 3) Shape Picker -->
-    <label>
-      Shape
-      <select id="shapePicker" disabled>
-        <option value="circle">Circle</option>
-        <option value="rect">Square</option>
-      </select>
-    </label>
-
-    <!-- 4) Size Slider -->
-    <label>
-      Size
-      <input type="range" id="sizePicker" min="5" max="100" value="30" disabled />
-    </label>
-
-    <!-- 5) 20-Color Palette -->
-    <div id="colorPalette"></div>
-
-    <!-- 6) Clear Button -->
-    <button id="clearBtn" disabled>Clear</button>
-  </div>
-
-  <!-- ------------------------------------------- -->
-  <!-- CANVAS HTML                                 -->
-  <canvas id="canvas"></canvas>
-
-  <script>
-    // --- DOM REFERENCES ---
-    const canvas       = document.getElementById('canvas');
-    const ctx          = canvas.getContext('2d');
-    const toolbar      = document.getElementById('toolbar');
-    const tplPicker    = document.getElementById('templatePicker');
-    const loadingText  = document.getElementById('loadingIndicator');
-    const sprayBtn     = document.getElementById('sprayBtn');
-    const brushBtn     = document.getElementById('brushBtn');
-    const shapeBtn     = document.getElementById('shapeBtn');
-    const fillBtn      = document.getElementById('fillBtn');
-    const shapePicker  = document.getElementById('shapePicker');
-    const sizePicker   = document.getElementById('sizePicker');
-    const colorPalette = document.getElementById('colorPalette');
-    const clearBtn     = document.getElementById('clearBtn');
-
-    // --- STATE VARIABLES ---
-    let tool = 'spray';                // currently selected tool
-    let isReady = true;                // false while a template image is loading
-    let spraying = false;              // for spray tool
-    let brushDrawing = false;          // for brush tool
-    let lastPos = { x: 0, y: 0 };      // last pointer position
-    let currentColor = '#e6194b';      // default first palette color
-
-    // 20-color palette (feel free to adjust hex values)
-    const PALETTE = [
-      '#e6194b','#3cb44b','#ffe119','#0082c8','#f58231',
-      '#911eb4','#46f0f0','#f032e6','#d2f53c','#fabebe',
-      '#008080','#e6beff','#aa6e28','#fffac8','#800000',
-      '#aaffc3','#808000','#ffd8b1','#000080','#808080'
-    ];
-
-    // --- HELPER: RESIZE CANVAS & POSITION IT BELOW TOOLBAR ---
-    function positionCanvas() {
-      // 1) Resize canvas to fill window
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-      // 2) Measure toolbar’s bottom edge so we can push canvas down
-      const toolbarRect = toolbar.getBoundingClientRect();
-      const topOffset = toolbarRect.bottom + 4; // 4px gap below toolbar
-
-      // Set CSS so that the canvas’ drawing area begins at topOffset
-      canvas.style.top = topOffset + 'px';
-      // Canvas height is full window minus that offset
-      canvas.style.height = (window.innerHeight - topOffset) + 'px';
-    }
-    window.addEventListener('resize', positionCanvas);
-    window.addEventListener('load', positionCanvas);
-    positionCanvas();
-
-    // --- BUILD 20-COLOR PALETTE UI ---
-    function buildPalette() {
-      colorPalette.innerHTML = '';
-      PALETTE.forEach(hex => {
-        const sw = document.createElement('div');
-        sw.classList.add('swatch');
-        sw.style.backgroundColor = hex;
-        if (hex === currentColor) sw.classList.add('selected');
-        sw.addEventListener('click', () => {
-          currentColor = hex;
-          document.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
-          sw.classList.add('selected');
-        });
-        colorPalette.appendChild(sw);
-      });
-    }
-    buildPalette();
-
-    // --- ENABLE / DISABLE TOOL UI ELEMENTS ---
-    function setToolsEnabled(enabled) {
-      [sprayBtn, brushBtn, shapeBtn, fillBtn, shapePicker, sizePicker, clearBtn]
-        .forEach(el => el.disabled = !enabled);
-      // Also enable/disable palette swatches
-      document.querySelectorAll('.swatch').forEach(s => {
-        s.style.pointerEvents = enabled ? 'auto' : 'none';
-      });
-    }
-
-    // At load time, we want to allow drawing on a blank canvas
-    window.addEventListener('load', () => {
-      setToolsEnabled(true);
-    });
-
-    // --- CHANGE TOOL HANDLER ---
-    function setTool(t) {
-      tool = t;
-    }
-    sprayBtn.addEventListener('click', () => setTool('spray'));
-    brushBtn.addEventListener('click', () => setTool('brush'));
-    shapeBtn.addEventListener('click', () => setTool('shape'));
-    fillBtn.addEventListener('click', () => setTool('fill'));
-
-    // --- TEMPLATE LOADING LOGIC ---
-    tplPicker.addEventListener('change', () => {
-      const src = tplPicker.value;
-
-      if (!src) {
-        // If user picks “-- choose image --”, clear and re-enable tools
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        setToolsEnabled(true);
-        isReady = true;
-        return;
-      }
-
-      // Otherwise, user selected a PNG template
-      isReady = false;
-      loadingText.style.display = 'inline';
-      setToolsEnabled(false);
-
-      const img = new Image();
-      img.onload = () => {
-        // Fit image into canvas, preserving aspect ratio
-        const cw = canvas.width, ch = canvas.height;
-        const iw = img.width, ih = img.height;
-        const scale = Math.min(cw / iw, ch / ih);
-        const dw = iw * scale, dh = ih * scale;
-        const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
-
-        ctx.clearRect(0, 0, cw, ch);
-        ctx.drawImage(img, dx, dy, dw, dh);
-
-        // Small delay to ensure the browser finishes painting
-        setTimeout(() => {
-          isReady = true;
-          loadingText.style.display = 'none';
-          setToolsEnabled(true);
-        }, 100);
-      };
-      img.onerror = () => {
-        console.warn('Failed to load template:', src);
-        loadingText.textContent = 'Error loading image';
-        setTimeout(() => {
-          loadingText.style.display = 'none';
-          setToolsEnabled(true);
-          isReady = true;
-        }, 800);
-      };
-      img.src = src;
-    });
-
-    // --- HELPER TO GET CANVAS-RELATIVE POINTER POS ---
-    function getCanvasPos(e) {
-      const rect = canvas.getBoundingClientRect();
-      return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      };
-    }
-
-    // --- SPRAY TOOL ---
-    function startSpray(e) {
-      e.preventDefault();
-      if (!isReady) return;
-      lastPos = getCanvasPos(e);
-      spraying = true;
-      sprayOnce();
-      window.sprayInt = setInterval(sprayOnce, 50);
-    }
-    function sprayOnce() {
-      if (!spraying) return;
-      const r = parseInt(sizePicker.value, 10);
-      ctx.fillStyle = currentColor;
-      const dotCount = Math.floor(r * 0.5);
-      for (let i = 0; i < dotCount; i++) {
-        const dx = (Math.random() * 2 * r) - r;
-        const dy = (Math.random() * 2 * r) - r;
-        if (dx * dx + dy * dy <= r * r) {
-          ctx.fillRect(lastPos.x + dx, lastPos.y + dy, 2, 2);
-        }
-      }
-    }
-
-    // --- BRUSH TOOL ---
-    function startBrush(e) {
-      e.preventDefault();
-      if (!isReady) return;
-      brushDrawing = true;
-      const p = getCanvasPos(e);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-    }
-    function brushMove(e) {
-      if (!brushDrawing || !isReady) return;
-      e.preventDefault();
-      const p = getCanvasPos(e);
-      ctx.strokeStyle = currentColor;
-      ctx.lineWidth = parseInt(sizePicker.value, 10);
-      ctx.lineTo(p.x, p.y);
-      ctx.stroke();
-    }
-
-    // --- SHAPE TOOL ---
-    function drawShape(e) {
-      e.preventDefault();
-      if (!isReady) return;
-      const p = getCanvasPos(e);
-      const s = parseInt(sizePicker.value, 10);
-      ctx.fillStyle = currentColor;
-      if (shapePicker.value === 'circle') {
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, s, 0, 2 * Math.PI);
-        ctx.fill();
-      } else {
-        ctx.fillRect(p.x - s/2, p.y - s/2, s, s);
-      }
-    }
-
-    // --- FILL TOOL (FLOOD-FILL) ---
-    function floodFill(x, y) {
-      if (!isReady) return;
-      const w = canvas.width, h = canvas.height;
-      const imgData = ctx.getImageData(0, 0, w, h);
-      const d = imgData.data;
-      const px = Math.floor(x), py = Math.floor(y);
-      if (px < 0 || px >= w || py < 0 || py >= h) return;
-
-      const idx = (py * w + px) * 4;
-      const targetR = d[idx], targetG = d[idx+1], targetB = d[idx+2], targetA = d[idx+3];
-      const fillCol = hexToRgba(currentColor);
-
-      // If clicked pixel already matches fill color, do nothing
-      if (
-        targetR === fillCol.r &&
-        targetG === fillCol.g &&
-        targetB === fillCol.b &&
-        targetA === fillCol.a
-      ) {
-        return;
-      }
-
-      const stack = [[px, py]];
-      while (stack.length) {
-        const [cx, cy] = stack.pop();
-        if (cx < 0 || cx >= w || cy < 0 || cy >= h) continue;
-        const i = (cy * w + cx) * 4;
-        if (
-          d[i]   === targetR &&
-          d[i+1] === targetG &&
-          d[i+2] === targetB &&
-          d[i+3] === targetA
-        ) {
-          d[i]   = fillCol.r;
-          d[i+1] = fillCol.g;
-          d[i+2] = fillCol.b;
-          d[i+3] = fillCol.a;
-          stack.push([cx+1, cy], [cx-1, cy], [cx, cy+1], [cx, cy-1]);
-        }
-      }
-      ctx.putImageData(imgData, 0, 0);
-    }
-    function hexToRgba(hex) {
-      const val = parseInt(hex.slice(1), 16);
-      return {
-        r: (val >> 16) & 0xFF,
-        g: (val >> 8)  & 0xFF,
-        b: (val      ) & 0xFF,
-        a: 255
-      };
-    }
-
-    // --- POINTER EVENT HANDLERS ---
-    function onPointerDown(e) {
-      if (!isReady) return;
-      switch (tool) {
-        case 'spray':
-          return startSpray(e);
-        case 'brush':
-          return startBrush(e);
-        case 'shape':
-          return drawShape(e);
-        case 'fill':
-          // Convert to canvas coords before passing to floodFill
-          const pos = getCanvasPos(e);
-          return floodFill(pos.x, pos.y);
-      }
-    }
-    function onPointerMove(e) {
-      if (!isReady) return;
-      lastPos = getCanvasPos(e);
-      if (tool === 'spray' && spraying) {
-        // We already updated lastPos above
-      } else if (tool === 'brush' && brushDrawing) {
-        brushMove(e);
-      }
-    }
-    function onPointerUp(e) {
-      spraying = false;
-      brushDrawing = false;
-      clearInterval(window.sprayInt);
-    }
-    function onPointerLeave(e) {
-      spraying = false;
-      brushDrawing = false;
-      clearInterval(window.sprayInt);
-    }
-
-    canvas.addEventListener('pointerdown', onPointerDown);
-    canvas.addEventListener('pointermove', onPointerMove);
-    canvas.addEventListener('pointerup', onPointerUp);
-    canvas.addEventListener('pointerleave', onPointerLeave);
-
-    // --- CLEAR BUTTON ---
-    clearBtn.addEventListener('click', () => {
-      if (!isReady) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-    });
-  </script>
-</body>
-</html>
+    <button id="sprayBtn" class="tool-button" disabled>Spray</button>
+    <button id="brushBtn" class="tool-button" disabled>Brush</button>
