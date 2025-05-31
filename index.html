@@ -5,17 +5,21 @@
   <title>Space Colouring Canvas</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
+    /* ------------------------------------------- */
+    /* GLOBAL RESET & BODY                          */
     html, body {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100%;
-      overflow: hidden;
-      background: #fff;           /* White page background */
-      touch-action: none;         /* Prevent default scrolling on touch */
+      overflow: hidden;    /* We’ll handle scrolling inside toolbar if needed */
+      background: #fff;    /* White behind everything */
+      touch-action: none;  /* Prevent page from scrolling when drawing */
+      font-family: 'Courier New', monospace;
     }
 
-    /* -------------------- TOOLBAR -------------------- */
+    /* ------------------------------------------- */
+    /* TOOLBAR                                     */
     #toolbar {
       position: absolute;
       top: 10px;
@@ -25,21 +29,21 @@
       flex-wrap: wrap;
       gap: 6px;
       align-items: center;
-      background: rgba(0, 0, 0, 0.6); /* slightly more transparent */
-      padding: 4px 6px;              /* smaller padding */
+      background: rgba(0, 0, 0, 0.6);   /* Slightly translucent so you can see behind it */
+      padding: 6px 10px;                /* Slightly smaller padding */
       border-radius: 6px;
       max-width: calc(100% - 20px);
-      max-height: 40vh;              /* limit height to 40% of viewport */
-      overflow-y: auto;              /* scroll if too tall */
+      max-height: 40vh;                 /* Never taller than 40% of viewport */
+      overflow-y: auto;                 /* If too tall, it scrolls internally */
       box-sizing: border-box;
-      z-index: 10;
+      z-index: 10;                       /* Keep it always on top */
     }
     #toolbar * {
-      font-family: 'Courier New', monospace;
       color: #fff;
-      user-select: none;
-      font-size: 0.85em; /* smaller font */
+      user-select: none; /* Prevent selecting text when tapping on mobile */
+      font-size: 0.85em; /* Smaller font so things fit */
     }
+    /* Labels, selects, buttons, range sliders all share this look */
     #toolbar label,
     #toolbar select,
     #toolbar button,
@@ -52,11 +56,12 @@
       cursor: pointer;
       touch-action: none;
     }
+    /* Make the range slider narrower to save space */
     #toolbar input[type="range"] {
+      width: 70px;
+      margin: 0 2px;
       -webkit-appearance: none;
       appearance: none;
-      width: 70px; /* narrower slider */
-      margin: 0 2px;
     }
     #toolbar input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
@@ -68,7 +73,7 @@
       cursor: pointer;
     }
 
-    /* 20-color palette as small squares */
+    /* 20‐Color Palette Swatches */
     #colorPalette {
       display: flex;
       flex-wrap: wrap;
@@ -86,27 +91,30 @@
       outline: 2px solid #fff;
     }
 
-    /* Loading indicator (small text) */
+    /* Loading indicator text */
     #loadingIndicator {
       color: #ff0;
       font-size: 0.8em;
       margin-left: 4px;
     }
 
-    /* -------------------- CANVAS -------------------- */
-    canvas {
+    /* ------------------------------------------- */
+    /* CANVAS                                      */
+    #canvas {
       position: absolute;
-      top: 0;
+      top: 0;     /* We’ll offset it via JS so it sits below the toolbar */
       left: 0;
       width: 100%;
       height: 100%;
-      background: #fff;     /* White canvas background */
-      touch-action: none;   /* Prevent scrolling while drawing */
+      background: #fff;     /* White behind everything */
+      touch-action: none;   /* Prevent page from scrolling while drawing */
     }
   </style>
 </head>
 <body>
-  <!-- -------------------- TOOLBAR HTML -------------------- -->
+
+  <!-- ------------------------------------------- -->
+  <!-- TOOLBAR HTML                                -->
   <div id="toolbar">
     <!-- 1) Template Selector -->
     <label>
@@ -148,33 +156,35 @@
     <button id="clearBtn" disabled>Clear</button>
   </div>
 
-  <!-- -------------------- CANVAS HTML -------------------- -->
+  <!-- ------------------------------------------- -->
+  <!-- CANVAS HTML                                 -->
   <canvas id="canvas"></canvas>
 
   <script>
-    // --- DOM ELEMENTS ---
-    const canvas        = document.getElementById('canvas');
-    const ctx           = canvas.getContext('2d');
-    const tplPicker     = document.getElementById('templatePicker');
-    const loadingText   = document.getElementById('loadingIndicator');
-    const sprayBtn      = document.getElementById('sprayBtn');
-    const brushBtn      = document.getElementById('brushBtn');
-    const shapeBtn      = document.getElementById('shapeBtn');
-    const fillBtn       = document.getElementById('fillBtn');
-    const shapePicker   = document.getElementById('shapePicker');
-    const sizePicker    = document.getElementById('sizePicker');
-    const colorPalette  = document.getElementById('colorPalette');
-    const clearBtn      = document.getElementById('clearBtn');
+    // --- DOM REFERENCES ---
+    const canvas       = document.getElementById('canvas');
+    const ctx          = canvas.getContext('2d');
+    const toolbar      = document.getElementById('toolbar');
+    const tplPicker    = document.getElementById('templatePicker');
+    const loadingText  = document.getElementById('loadingIndicator');
+    const sprayBtn     = document.getElementById('sprayBtn');
+    const brushBtn     = document.getElementById('brushBtn');
+    const shapeBtn     = document.getElementById('shapeBtn');
+    const fillBtn      = document.getElementById('fillBtn');
+    const shapePicker  = document.getElementById('shapePicker');
+    const sizePicker   = document.getElementById('sizePicker');
+    const colorPalette = document.getElementById('colorPalette');
+    const clearBtn     = document.getElementById('clearBtn');
 
     // --- STATE VARIABLES ---
-    let tool = 'spray';                // 'spray', 'brush', 'shape', 'fill'
-    let isReady = true;                // disables tools while template loads
-    let spraying = false;
-    let brushDrawing = false;
-    let lastPos = { x: 0, y: 0 };
-    let currentColor = '#e6194b';      // default first color from palette
+    let tool = 'spray';                // currently selected tool
+    let isReady = true;                // false while a template image is loading
+    let spraying = false;              // for spray tool
+    let brushDrawing = false;          // for brush tool
+    let lastPos = { x: 0, y: 0 };      // last pointer position
+    let currentColor = '#e6194b';      // default first palette color
 
-    // 20-color palette (modifiable hex values)
+    // 20-color palette (feel free to adjust hex values)
     const PALETTE = [
       '#e6194b','#3cb44b','#ffe119','#0082c8','#f58231',
       '#911eb4','#46f0f0','#f032e6','#d2f53c','#fabebe',
@@ -182,15 +192,25 @@
       '#aaffc3','#808000','#ffd8b1','#000080','#808080'
     ];
 
-    // --- RESIZE CANVAS TO FILL WINDOW ---
-    function resizeCanvas() {
+    // --- HELPER: RESIZE CANVAS & POSITION IT BELOW TOOLBAR ---
+    function positionCanvas() {
+      // 1) Resize canvas to fill window
       canvas.width  = window.innerWidth;
       canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
+      // 2) Measure toolbar’s bottom edge so we can push canvas down
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const topOffset = toolbarRect.bottom + 4; // 4px gap below toolbar
 
-    // --- BUILD COLOR PALETTE UI ---
+      // Set CSS so that the canvas’ drawing area begins at topOffset
+      canvas.style.top = topOffset + 'px';
+      // Canvas height is full window minus that offset
+      canvas.style.height = (window.innerHeight - topOffset) + 'px';
+    }
+    window.addEventListener('resize', positionCanvas);
+    window.addEventListener('load', positionCanvas);
+    positionCanvas();
+
+    // --- BUILD 20-COLOR PALETTE UI ---
     function buildPalette() {
       colorPalette.innerHTML = '';
       PALETTE.forEach(hex => {
@@ -212,52 +232,56 @@
     function setToolsEnabled(enabled) {
       [sprayBtn, brushBtn, shapeBtn, fillBtn, shapePicker, sizePicker, clearBtn]
         .forEach(el => el.disabled = !enabled);
-      // Also enable/disable color swatches
+      // Also enable/disable palette swatches
       document.querySelectorAll('.swatch').forEach(s => {
         s.style.pointerEvents = enabled ? 'auto' : 'none';
       });
     }
 
-    // Initially, tools are enabled (blank canvas)
+    // At load time, we want to allow drawing on a blank canvas
     window.addEventListener('load', () => {
       setToolsEnabled(true);
     });
 
-    // --- SWITCH TOOL FUNCTION ---
+    // --- CHANGE TOOL HANDLER ---
     function setTool(t) {
       tool = t;
     }
+    sprayBtn.addEventListener('click', () => setTool('spray'));
+    brushBtn.addEventListener('click', () => setTool('brush'));
+    shapeBtn.addEventListener('click', () => setTool('shape'));
+    fillBtn.addEventListener('click', () => setTool('fill'));
 
     // --- TEMPLATE LOADING LOGIC ---
     tplPicker.addEventListener('change', () => {
       const src = tplPicker.value;
+
       if (!src) {
-        // If “-- choose image --,” simply clear and enable tools right away:
+        // If user picks “-- choose image --”, clear and re-enable tools
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         setToolsEnabled(true);
         isReady = true;
         return;
       }
 
-      // User selected an actual PNG template:
+      // Otherwise, user selected a PNG template
       isReady = false;
       loadingText.style.display = 'inline';
       setToolsEnabled(false);
 
       const img = new Image();
       img.onload = () => {
-        // Compute scale to fit within canvas:
+        // Fit image into canvas, preserving aspect ratio
         const cw = canvas.width, ch = canvas.height;
         const iw = img.width, ih = img.height;
         const scale = Math.min(cw / iw, ch / ih);
         const dw = iw * scale, dh = ih * scale;
         const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
 
-        // Draw onto canvas:
         ctx.clearRect(0, 0, cw, ch);
         ctx.drawImage(img, dx, dy, dw, dh);
 
-        // Small delay to ensure canvas gets fully painted
+        // Small delay to ensure the browser finishes painting
         setTimeout(() => {
           isReady = true;
           loadingText.style.display = 'none';
@@ -276,17 +300,20 @@
       img.src = src;
     });
 
-    // --- HELPER: GET POINTER COORDINATES ---
-    function getPointerPos(e) {
-      // clientX / clientY map directly to canvas pixel coordinates
-      return { x: e.clientX, y: e.clientY };
+    // --- HELPER TO GET CANVAS-RELATIVE POINTER POS ---
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
     }
 
-    // --- SPRAY TOOL IMPLEMENTATION ---
+    // --- SPRAY TOOL ---
     function startSpray(e) {
       e.preventDefault();
       if (!isReady) return;
-      lastPos = getPointerPos(e);
+      lastPos = getCanvasPos(e);
       spraying = true;
       sprayOnce();
       window.sprayInt = setInterval(sprayOnce, 50);
@@ -305,30 +332,30 @@
       }
     }
 
-    // --- BRUSH TOOL IMPLEMENTATION ---
+    // --- BRUSH TOOL ---
     function startBrush(e) {
       e.preventDefault();
       if (!isReady) return;
       brushDrawing = true;
-      const p = getPointerPos(e);
+      const p = getCanvasPos(e);
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
     }
     function brushMove(e) {
       if (!brushDrawing || !isReady) return;
       e.preventDefault();
-      const p = getPointerPos(e);
+      const p = getCanvasPos(e);
       ctx.strokeStyle = currentColor;
       ctx.lineWidth = parseInt(sizePicker.value, 10);
       ctx.lineTo(p.x, p.y);
       ctx.stroke();
     }
 
-    // --- SHAPE TOOL IMPLEMENTATION ---
+    // --- SHAPE TOOL ---
     function drawShape(e) {
       e.preventDefault();
       if (!isReady) return;
-      const p = getPointerPos(e);
+      const p = getCanvasPos(e);
       const s = parseInt(sizePicker.value, 10);
       ctx.fillStyle = currentColor;
       if (shapePicker.value === 'circle') {
@@ -340,7 +367,7 @@
       }
     }
 
-    // --- FILL TOOL (FLOOD-FILL) IMPLEMENTATION ---
+    // --- FILL TOOL (FLOOD-FILL) ---
     function floodFill(x, y) {
       if (!isReady) return;
       const w = canvas.width, h = canvas.height;
@@ -353,7 +380,7 @@
       const targetR = d[idx], targetG = d[idx+1], targetB = d[idx+2], targetA = d[idx+3];
       const fillCol = hexToRgba(currentColor);
 
-      // If clicked pixel already has fill color, bail out
+      // If clicked pixel already matches fill color, do nothing
       if (
         targetR === fillCol.r &&
         targetG === fillCol.g &&
@@ -397,17 +424,23 @@
     function onPointerDown(e) {
       if (!isReady) return;
       switch (tool) {
-        case 'spray':  return startSpray(e);
-        case 'brush':  return startBrush(e);
-        case 'shape':  return drawShape(e);
-        case 'fill':   return floodFill(e.clientX, e.clientY);
+        case 'spray':
+          return startSpray(e);
+        case 'brush':
+          return startBrush(e);
+        case 'shape':
+          return drawShape(e);
+        case 'fill':
+          // Convert to canvas coords before passing to floodFill
+          const pos = getCanvasPos(e);
+          return floodFill(pos.x, pos.y);
       }
     }
     function onPointerMove(e) {
       if (!isReady) return;
-      lastPos = getPointerPos(e);
+      lastPos = getCanvasPos(e);
       if (tool === 'spray' && spraying) {
-        // lastPos updated above
+        // We already updated lastPos above
       } else if (tool === 'brush' && brushDrawing) {
         brushMove(e);
       }
