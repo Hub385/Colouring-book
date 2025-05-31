@@ -213,3 +213,330 @@
     <!-- 2) Tool Buttons -->
     <button id="sprayBtn" class="tool-button" disabled>Spray</button>
     <button id="brushBtn" class="tool-button" disabled>Brush</button>
+    <button id="shapeBtn" class="tool-button" disabled>Shape</button>
+    <button id="fillBtn" class="tool-button" disabled>Fill</button>
+
+    <!-- 3) Shape Picker -->
+    <label class="small-label">
+      Shape
+      <select id="shapePicker" disabled>
+        <option value="circle">Circle</option>
+        <option value="rect">Square</option>
+      </select>
+    </label>
+
+    <!-- 4) Size Slider -->
+    <label class="small-label">
+      Size
+      <input type="range" id="sizePicker" min="5" max="100" value="30" disabled />
+    </label>
+
+    <!-- 5) 20-Color Palette -->
+    <div id="colorPalette"></div>
+
+    <!-- 6) Clear Button -->
+    <button id="clearBtn" disabled>Clear</button>
+  </div>
+
+  <!-- CANVAS -->
+  <canvas id="canvas"></canvas>
+
+  <script>
+    // --- DOM REFERENCES ---
+    const canvas       = document.getElementById('canvas');
+    const ctx          = canvas.getContext('2d');
+    const toolbar      = document.getElementById('toolbar');
+    const tplPicker    = document.getElementById('templatePicker');
+    const loadingText  = document.getElementById('loadingIndicator');
+    const sprayBtn     = document.getElementById('sprayBtn');
+    const brushBtn     = document.getElementById('brushBtn');
+    const shapeBtn     = document.getElementById('shapeBtn');
+    const fillBtn      = document.getElementById('fillBtn');
+    const shapePicker  = document.getElementById('shapePicker');
+    const sizePicker   = document.getElementById('sizePicker');
+    const colorPalette = document.getElementById('colorPalette');
+    const clearBtn     = document.getElementById('clearBtn');
+
+    // --- STATE VARIABLES ---
+    let tool = 'spray';                // 'spray', 'brush', 'shape', 'fill'
+    let isReady = true;                // false while template loads
+    let spraying = false;              // for spray tool
+    let brushDrawing = false;          // for brush tool
+    let lastPos = { x: 0, y: 0 };      // last pointer position on canvas
+    let currentColor = '#e6194b';      // default first color from palette
+
+    // 20-Color Palette (modifiable)
+    const PALETTE = [
+      '#e6194b','#3cb44b','#ffe119','#0082c8','#f58231',
+      '#911eb4','#46f0f0','#f032e6','#d2f53c','#fabebe',
+      '#008080','#e6beff','#aa6e28','#fffac8','#800000',
+      '#aaffc3','#808000','#ffd8b1','#000080','#808080'
+    ];
+
+    // --- RESIZE & POSITION CANVAS BELOW TOOLBAR ---
+    function positionCanvas() {
+      // 1) Resize
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      // 2) Push down by toolbar’s height + 12px gap
+      const rect = toolbar.getBoundingClientRect();
+      const topOffset = rect.bottom + 8; // 8px gap below toolbar
+      canvas.style.top = topOffset + 'px';
+      // 3) Adjust canvas height so it is viewport height minus offset
+      canvas.style.height = (window.innerHeight - topOffset) + 'px';
+    }
+    window.addEventListener('resize', positionCanvas);
+    window.addEventListener('load', positionCanvas);
+    positionCanvas();
+
+    // --- BUILD COLOR PALETTE UI ---
+    function buildPalette() {
+      colorPalette.innerHTML = '';
+      PALETTE.forEach(hex => {
+        const sw = document.createElement('div');
+        sw.classList.add('swatch');
+        sw.style.backgroundColor = hex;
+        if (hex === currentColor) sw.classList.add('selected');
+        sw.addEventListener('click', () => {
+          currentColor = hex;
+          document.querySelectorAll('.swatch').forEach(s => s.classList.remove('selected'));
+          sw.classList.add('selected');
+        });
+        colorPalette.appendChild(sw);
+      });
+    }
+    buildPalette();
+
+    // --- ENABLE / DISABLE TOOL UI ELEMENTS ---
+    function setToolsEnabled(enabled) {
+      [sprayBtn, brushBtn, shapeBtn, fillBtn, shapePicker, sizePicker, clearBtn]
+        .forEach(el => el.disabled = !enabled);
+      document.querySelectorAll('.swatch').forEach(s => {
+        s.style.pointerEvents = enabled ? 'auto' : 'none';
+      });
+    }
+    // Initially, allow drawing on a blank canvas
+    window.addEventListener('load', () => {
+      setToolsEnabled(true);
+    });
+
+    // --- TOOL SELECTION HANDLERS ---
+    function setTool(t) {
+      tool = t;
+    }
+    sprayBtn.addEventListener('click', () => setTool('spray'));
+    brushBtn.addEventListener('click', () => setTool('brush'));
+    shapeBtn.addEventListener('click', () => setTool('shape'));
+    fillBtn.addEventListener('click', () => setTool('fill'));
+
+    // --- TEMPLATE LOADING LOGIC ---
+    tplPicker.addEventListener('change', () => {
+      const src = tplPicker.value;
+      if (!src) {
+        // If “-- choose image --,” just clear and re-enable tools
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        setToolsEnabled(true);
+        isReady = true;
+        return;
+      }
+
+      isReady = false;
+      loadingText.style.display = 'inline';
+      setToolsEnabled(false);
+
+      const img = new Image();
+      img.onload = () => {
+        const cw = canvas.width, ch = canvas.height;
+        const iw = img.width, ih = img.height;
+        const scale = Math.min(cw / iw, ch / ih);
+        const dw = iw * scale, dh = ih * scale;
+        const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
+        ctx.clearRect(0, 0, cw, ch);
+        ctx.drawImage(img, dx, dy, dw, dh);
+
+        // Delay so browser finishes painting
+        setTimeout(() => {
+          isReady = true;
+          loadingText.style.display = 'none';
+          setToolsEnabled(true);
+        }, 100);
+      };
+      img.onerror = () => {
+        console.warn('Failed to load template:', src);
+        loadingText.textContent = 'Error loading image';
+        setTimeout(() => {
+          loadingText.style.display = 'none';
+          setToolsEnabled(true);
+          isReady = true;
+        }, 800);
+      };
+      img.src = src;
+    });
+
+    // --- MAP POINTER EVENT TO CANVAS COORDINATES ---
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
+
+    // --- SPRAY TOOL IMPLEMENTATION ---
+    function startSpray(e) {
+      e.preventDefault();
+      if (!isReady) return;
+      lastPos = getCanvasPos(e);
+      spraying = true;
+      sprayOnce();
+      window.sprayInt = setInterval(sprayOnce, 50);
+    }
+    function sprayOnce() {
+      if (!spraying) return;
+      const r = parseInt(sizePicker.value, 10);
+      ctx.fillStyle = currentColor;
+      const dotCount = Math.floor(r * 0.5);
+      for (let i = 0; i < dotCount; i++) {
+        const dx = (Math.random() * 2 * r) - r;
+        const dy = (Math.random() * 2 * r) - r;
+        if (dx * dx + dy * dy <= r * r) {
+          ctx.fillRect(lastPos.x + dx, lastPos.y + dy, 2, 2);
+        }
+      }
+    }
+
+    // --- BRUSH TOOL IMPLEMENTATION ---
+    function startBrush(e) {
+      e.preventDefault();
+      if (!isReady) return;
+      brushDrawing = true;
+      const p = getCanvasPos(e);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+    }
+    function brushMove(e) {
+      if (!brushDrawing || !isReady) return;
+      e.preventDefault();
+      const p = getCanvasPos(e);
+      ctx.strokeStyle = currentColor;
+      ctx.lineWidth = parseInt(sizePicker.value, 10);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+    }
+
+    // --- SHAPE TOOL IMPLEMENTATION ---
+    function drawShape(e) {
+      e.preventDefault();
+      if (!isReady) return;
+      const p = getCanvasPos(e);
+      const s = parseInt(sizePicker.value, 10);
+      ctx.fillStyle = currentColor;
+      if (shapePicker.value === 'circle') {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, s, 0, 2 * Math.PI);
+        ctx.fill();
+      } else {
+        ctx.fillRect(p.x - s/2, p.y - s/2, s, s);
+      }
+    }
+
+    // --- FILL TOOL: BARRIER-BASED FLOOD FILL ---
+    function floodFill(x, y) {
+      if (!isReady) return;
+      const w = canvas.width, h = canvas.height;
+      const imgData = ctx.getImageData(0, 0, w, h);
+      const d = imgData.data;
+      const px = Math.floor(x), py = Math.floor(y);
+      if (px < 0 || px >= w || py < 0 || py >= h) return;
+
+      // Barrier threshold: any pixel whose grayscale <= threshold is barrier
+      const barrierThreshold = 50; // out of 255 (0 = black, 255 = white)
+      const fillCol = hexToRgba(currentColor);
+      const stack = [[px, py]];
+      const visited = new Uint8Array(w * h);
+
+      while (stack.length) {
+        const [cx, cy] = stack.pop();
+        if (cx < 0 || cx >= w || cy < 0 || cy >= h) continue;
+        const idx = (cy * w + cx);
+        if (visited[idx]) continue;
+
+        const i = idx * 4;
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        const brightness = (r + g + b) / 3;
+        // If barrier (dark line), skip
+        if (brightness <= barrierThreshold) continue;
+
+        // Fill pixel
+        d[i]     = fillCol.r;
+        d[i + 1] = fillCol.g;
+        d[i + 2] = fillCol.b;
+        d[i + 3] = 255;
+        visited[idx] = 1;
+
+        stack.push([cx + 1, cy]);
+        stack.push([cx - 1, cy]);
+        stack.push([cx, cy + 1]);
+        stack.push([cx, cy - 1]);
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+    }
+    function hexToRgba(hex) {
+      const v = parseInt(hex.slice(1), 16);
+      return {
+        r: (v >> 16) & 0xFF,
+        g: (v >> 8)  & 0xFF,
+        b: (v      ) & 0xFF,
+        a: 255
+      };
+    }
+
+    // --- POINTER EVENT HANDLERS ---
+    function onPointerDown(e) {
+      if (!isReady) return;
+      switch (tool) {
+        case 'spray':
+          return startSpray(e);
+        case 'brush':
+          return startBrush(e);
+        case 'shape':
+          return drawShape(e);
+        case 'fill':
+          const pos = getCanvasPos(e);
+          return floodFill(pos.x, pos.y);
+      }
+    }
+    function onPointerMove(e) {
+      if (!isReady) return;
+      lastPos = getCanvasPos(e);
+      if (tool === 'spray' && spraying) {
+        // spray once at new position
+      } else if (tool === 'brush' && brushDrawing) {
+        brushMove(e);
+      }
+    }
+    function onPointerUp(e) {
+      spraying = false;
+      brushDrawing = false;
+      clearInterval(window.sprayInt);
+    }
+    function onPointerLeave(e) {
+      spraying = false;
+      brushDrawing = false;
+      clearInterval(window.sprayInt);
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+
+    // --- CLEAR BUTTON HANDLER ---
+    clearBtn.addEventListener('click', () => {
+      if (!isReady) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+  </script>
+</body>
+</html> 
